@@ -1,0 +1,4 @@
+name: LoginSequence
+version: '1.0-SNAPSHOT'
+main: top.mcocet.loginSequence.LoginSequence
+api-version: '1.20'
