@@ -1,4 +1,17 @@
 name: LoginSequence
-version: '1.0-SNAPSHOT'
+version: '1.3.2'
 main: top.mcocet.loginSequence.LoginSequence
 api-version: '1.20'
+description: A plugin to manage player login sequence and perform connectivity tests.
+author: MCOCET
+
+commands:
+  logseq:
+    description: Main command for LoginSequence plugin
+    usage: /<command> [subcommand]
+    permission: logseq.admin
+    children:
+      ping:
+        description: Perform a manual connectivity test
+        usage: /logseq ping
+        permission: logseq.ping
