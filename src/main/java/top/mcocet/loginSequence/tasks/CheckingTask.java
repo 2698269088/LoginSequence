@@ -9,7 +9,9 @@ import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+
 import top.mcocet.loginSequence.LoginSequence;
+import top.mcocet.loginSequence.tasks.PingOnline;
 
 public class CheckingTask {
     private static final String SERVER_CONNECT_COMMAND = "Connect";
@@ -61,12 +63,16 @@ public class CheckingTask {
     }
 
     public void sendPlayerToSC(Player player) {
+        // 更新远程服务器信息
+        if (PingOnline.isStaServerInfoGet()){
+            Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "logseq info");
+        }
         // 清除玩家状态效果
         player.removePotionEffect(PotionEffectType.BLINDNESS);
         player.removePotionEffect(PotionEffectType.INVISIBILITY);
 
         try (ByteArrayOutputStream b = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(b)) {
+             DataOutputStream out = new DataOutputStream(b)) {
             out.writeUTF(SERVER_CONNECT_COMMAND);
             out.writeUTF(serverName);
             player.sendPluginMessage(loginSequence, "BungeeCord", b.toByteArray());

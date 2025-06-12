@@ -1,21 +1,14 @@
 package top.mcocet.loginSequence;
 
-// 特别说明：
-// 因为之前原作者手残
-// 导致插件源代码全部丢失
-// 现在你看到的是反编译后得到的版本（
-// 如果你觉得代码写得很抽象
-// 我也没办法（
-// 这是反编译后又经过AI优化并增加注释的版本（（（
-// 将就着看吧（（（（
-// :(
-
+import java.net.DatagramPacket;
+import java.net.InetAddress;
 import java.util.LinkedList;
 import java.util.Queue;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.ConsoleCommandSender;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -26,7 +19,10 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.bukkit.scoreboard.Objective;
+import org.bukkit.scoreboard.Scoreboard;
 import top.mcocet.loginSequence.tasks.CheckingTask;
+import top.mcocet.loginSequence.tasks.CommandTask;
 import top.mcocet.loginSequence.tasks.PingOnline;
 
 public class LoginSequence extends JavaPlugin implements Listener {
@@ -35,21 +31,29 @@ public class LoginSequence extends JavaPlugin implements Listener {
     private boolean isTransferring = false; // 是否正在转移玩家
     private CheckingTask checkingTask; // 检查任务实例
     private PingOnline pingOnline; // 在线检测实例
+    private CommandTask commandTask;
 
     public void onEnable() {
+        // logo
+        sayLog(ChatColor.AQUA+"    "+" "+ChatColor.BLUE+" __ "+" "+ChatColor.YELLOW+" ___");
+        sayLog(ChatColor.AQUA+"|   "+" "+ChatColor.BLUE+"(__ "+" "+ChatColor.YELLOW+"|___");
+        sayLog(ChatColor.AQUA+"|___"+" "+ChatColor.BLUE+" __)"+" "+ChatColor.YELLOW+"|___"+ChatColor.GREEN+"    LoginSequence v1.4.3");
+        sayLog("");
         // 注册事件监听器
         Bukkit.getPluginManager().registerEvents(this, this);
         // 注册BungeeCord插件通道
         getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
-
-        // logo
-        sayLog(ChatColor.AQUA+"    "+" "+ChatColor.BLUE+" __ "+" "+ChatColor.YELLOW+" ___");
-        sayLog(ChatColor.AQUA+"|   "+" "+ChatColor.BLUE+"(__ "+" "+ChatColor.YELLOW+"|___");
-        sayLog(ChatColor.AQUA+"|___"+" "+ChatColor.BLUE+" __)"+" "+ChatColor.YELLOW+"|___"+ChatColor.GREEN+"    LoginSequence v1.3.2");
-        getLogger().info("LoginSequence已启用！");
-        // 初始化检查任务和在线检测
+        // 初始化任务
+        FillTask.initConfig(this);
         checkingTask = new CheckingTask(this);
         pingOnline = new PingOnline(this);
+        commandTask = new CommandTask(this, pingOnline);
+
+        // 初始化指令
+        getCommand("logseq").setExecutor(commandTask);
+
+        getLogger().info("LoginSequence已启用！");
+
         // 如果启用了连接性测试，则开始测试
         if (pingOnline.isConnectivityTestEnabled()) {
             pingOnline.startConnectivityTest();
@@ -64,39 +68,7 @@ public class LoginSequence extends JavaPlugin implements Listener {
                 LoginSequence.this.checkingTask.notifyQueuePositions();
             }
         }).runTaskTimer(this, 0L, 100L);
-        // 设置命令执行器
-        getCommand("logseq").setExecutor((sender, command, label, args) -> {
-            if (args.length == 0) {
-                sender.sendMessage(ChatColor.RED + "请指定子命令。用法: /logseq ping");
-                return false;
-            } else if (args[0].equalsIgnoreCase("ping")) {
-                if (sender instanceof Player) {
-                    Player player = (Player)sender;
-                    if (!player.hasPermission("logseq.ping")) {
-                        player.sendMessage(ChatColor.RED + "你没有权限执行此命令。");
-                        return false;
-                    }
 
-                    pingOnline.manualPing(player);
-                } else if (sender.isOp()) {
-                    pingOnline.manualPing(sender);
-                } else {
-                    sender.sendMessage(ChatColor.RED + "此命令只能由玩家或控制台执行。");
-                }
-
-                return true;
-            } else if (args[0].equalsIgnoreCase("cmdpingtest")) {  // 新增cmdpingtest命令处理
-                if (!(sender instanceof org.bukkit.command.ConsoleCommandSender)) {
-                    sender.sendMessage(ChatColor.RED + "该指令只能由控制台执行");
-                    return false;
-                }
-                silentPingTest();  // 执行静默检测
-                return true;
-            } else {
-                sender.sendMessage(ChatColor.RED + "未知的子命令。");
-                return false;
-            }
-        });
     }
 
     public void onDisable() {
@@ -104,8 +76,14 @@ public class LoginSequence extends JavaPlugin implements Listener {
         getLogger().info("LoginSequence已关闭！");
     }
 
+    // 玩家加入事件处理
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
+        // 玩家加入后自动获取远程服务器状态
+        if (pingOnline.isServerInfoGet()) {
+            Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "logseq info");
+        }
+
         Player player = event.getPlayer();
         if (!player.isValid()){
             return;
@@ -122,11 +100,13 @@ public class LoginSequence extends JavaPlugin implements Listener {
                 }
             }
         }.runTaskLater(this, 1L); // 延迟 1 tick 执行
-        // 2秒后执行的代码
+        // 1秒后执行的代码
         new BukkitRunnable() {
             @Override
             public void run() {
-                if (!player.isOnline()) return; // 检查玩家是否还在线
+                if (!player.isOnline()){
+                    return; // 检查玩家是否还在线
+                }
                 String playerName = player.getName();
                 playerInitOut(playerName);
                 player.sendMessage(ChatColor.AQUA + "玩家 " + player.getName() + " 加入了服务器！");
@@ -142,9 +122,8 @@ public class LoginSequence extends JavaPlugin implements Listener {
                     checkingTask.processQueue();
                 }
             }
-        }.runTaskLater(this, 40L); // 60 ticks = 3秒
+        }.runTaskLater(this, 20L);
     }
-
 
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
@@ -155,7 +134,7 @@ public class LoginSequence extends JavaPlugin implements Listener {
         }
     }
 
-
+    // 玩家加入日志
     public void playerInitOut(String playerName){
         sayLog(ChatColor.GOLD+"========================================");
         sayLog(ChatColor.GOLD+"=");
@@ -163,6 +142,35 @@ public class LoginSequence extends JavaPlugin implements Listener {
         sayLog(ChatColor.GOLD+"=");
         sayLog(ChatColor.GOLD+"========================================");
     }
+
+    // 帮助信息处理方法
+    private void showHelp(CommandSender sender) {
+        sender.sendMessage(ChatColor.AQUA + "==== LoginSequence 指令帮助 ====");
+        sender.sendMessage(ChatColor.GOLD + "/logseq ping" + ChatColor.WHITE + " - 测试服务器连通性");
+        sender.sendMessage(ChatColor.GOLD + "/logseq info" + ChatColor.WHITE + " - 请求服务器状态数据");
+        sender.sendMessage(ChatColor.GOLD + "/logseq stavie" + ChatColor.WHITE + " - 查看服务器实时状态");
+        sender.sendMessage(ChatColor.GOLD + "/logseq help" + ChatColor.WHITE + " - 显示本帮助信息");
+    }
+
+    // 状态查看处理方法
+    private void handleStatusRequest(CommandSender sender) {
+        if (sender instanceof Player && !sender.hasPermission("logseq.stavie")) {
+            sender.sendMessage(ChatColor.RED + "你没有权限查看服务器状态");
+            return;
+        }
+
+        String status = String.format(
+                ChatColor.AQUA + "服务器状态:\n" +
+                        ChatColor.WHITE+"[LoginSequence Info] " + ChatColor.GREEN + "内存占用: %dMB\n" +
+                        ChatColor.WHITE+"[LoginSequence Info] " + ChatColor.GREEN + "在线玩家: %d\n" +
+                        ChatColor.WHITE+"[LoginSequence Info] " + ChatColor.GREEN + "TPS: %.1f",
+                pingOnline.getMemUsage(),
+                pingOnline.getOnlinePlayers(),
+                pingOnline.getServerTPS()
+        );
+        sender.sendMessage(status);
+    }
+
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
@@ -190,7 +198,7 @@ public class LoginSequence extends JavaPlugin implements Listener {
     }
 
     // 静默检测方法
-    private void silentPingTest() {
+    public void silentPingTest() {
         boolean success = pingOnline.silentPingCheck();
         // 静默模式不输出任何日志
     }

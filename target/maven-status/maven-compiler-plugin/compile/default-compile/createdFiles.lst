@@ -3,8 +3,11 @@ top\mcocet\loginSequence\tasks\PingOnline$ServerConnectivityTask.class
 top\mcocet\loginSequence\LoginSequence$2.class
 top\mcocet\loginSequence\tasks\PingOnline$ConnectivityTimeoutCheck.class
 top\mcocet\loginSequence\tasks\CheckingTask.class
+top\mcocet\loginSequence\FillTask.class
+top\mcocet\loginSequence\tasks\PingOnline$2.class
 top\mcocet\loginSequence\tasks\PingOnline.class
-top\mcocet\loginSequence\LoginSequence$1.class
 top\mcocet\loginSequence\tasks\CheckingTask$1.class
 top\mcocet\loginSequence\LoginSequence$3.class
 top\mcocet\loginSequence\LoginSequence.class
+top\mcocet\loginSequence\tasks\CommandTask.class
+top\mcocet\loginSequence\LoginSequence$1.class

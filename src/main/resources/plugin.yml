@@ -1,9 +1,10 @@
 name: LoginSequence
-version: '1.3.2'
+version: '1.4.3'
 main: top.mcocet.loginSequence.LoginSequence
 api-version: '1.20'
 description: A plugin to manage player login sequence and perform connectivity tests.
 author: MCOCET
+folia-supported: true
 
 commands:
   logseq:
