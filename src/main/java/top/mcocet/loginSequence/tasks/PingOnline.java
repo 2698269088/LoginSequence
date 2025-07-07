@@ -22,59 +22,39 @@ import top.mcocet.loginSequence.FillTask;
 import top.mcocet.loginSequence.LoginSequence;
 
 public class PingOnline {
+    // 配置文件路径常量
+    private static final String CONFIG_PATH = "plugins/LoginSequence/Config.yml";
+    // 日志文件路径
+    private static final String LOG_PATH = "plugins/LoginSequence/UDPData.log";
 
-    private static boolean serverOnlineInfo; // 服务器在线状态
+    public static boolean serverOnlineInfo; // 服务器在线状态
     private boolean outLog = true; // 是否输出日志
     private final LoginSequence plugin; // 主插件实例
     private DatagramSocket socket; // UDP套接字
-    private boolean testingServer = true; // 是否正在测试服务器
+    private static boolean testingServer = true; // 是否测试服务器
     private BukkitRunnable connectivityTask; // 连接性测试任务
     private BukkitRunnable currentTimeoutTask;// 连通性测试超时检测任务引用
     private BukkitRunnable infoTimeoutTask;// 远程服务器信息检测超时检测任务引用
     private boolean wasOffline = false; // 状态跟踪字段
     private boolean oneWasOffline = true; // 初次检测服务器
 
-    // 配置文件信息
-    private int port; // 端口号
-    private String ip; // IP地址
-    private static boolean pionli; // 是否启用在线检测
-    private String server; // 服务器名称
-    // 配置文件路径常量
-    private static final String CONFIG_PATH = "plugins/LoginSequence/Config.yml";
-    // 日志文件路径
-    private static final String LOG_PATH = "plugins/LoginSequence/UDPData.log";
-
     // 远程服务器状信息
     private volatile int memUsage = -1; // 内存使用率
     private volatile int onlinePlayers = -1; //  在线玩家数
     private volatile double serverTPS = -1.0; // 远程服务器TPS
+    private volatile int maxQuantity = -1; // 最大在线人数
+    private double quantityPercentage = -1.0; // 在线人数百分比
+
+    private int port = FillTask.port; // 服务器端口
+    private String ip = FillTask.ip; // 服务器IP
+    private static boolean pionli = FillTask.pionli; // 远程服务器是否开启
 
     public PingOnline(LoginSequence plugin) {
         this.plugin = plugin;
-        FillTask.initConfig(plugin);
-
-        YamlConfiguration yaml = new YamlConfiguration();
-
-        try {
-            File configFile = new File(CONFIG_PATH);
-            yaml.load(configFile);
-            this.port = yaml.getInt("Port"); // 添加this明确成员变量
-            this.ip = yaml.getString("ip");
-            this.pionli = yaml.getBoolean("pionli");
-            this.server = yaml.getString("server");
-        } catch (Exception e) {
-            plugin.getLogger().log(Level.SEVERE, "配置文件加载异常", e); // 增强异常处理
-        }
-        plugin.getLogger().info("配置文件读取完成！");
-        plugin.getLogger().info("IP: " + ip);
-        plugin.getLogger().info("端口： " + port);
-        plugin.getLogger().info("连接性检测： " + pionli);
-        plugin.getLogger().info("子服务器：" + server);
-        if (!pionli) {
-            sayLog(ChatColor.YELLOW + "[!] 服务器在线监测已关闭，将不会对服务器是否在线进行测试!");
+        if(!pionli){
             testingServer = false;
+            return;
         }
-
         // UDP监听线程
         (new Thread(() -> {
             try {
@@ -197,12 +177,14 @@ public class PingOnline {
         infoTimeoutTask = new BukkitRunnable() {
             @Override
             public void run() {
-                plugin.getLogger().warning("请求超时");
-                sayLog(ChatColor.RED + "无法获取远程服务器信息，可能已经离线");
+                plugin.getLogger().warning("无法获取远程服务器信息，请求超时");
+                plugin.silentPingTest();
                 // 重置远程服务器在线信息
                 memUsage = -1;
                 onlinePlayers = -1;
-                serverTPS = 1.1;
+                serverTPS = -1.0;
+                maxQuantity = -1;
+                quantityPercentage = -1.0;
             }
         };
         // 5秒后执行（20 ticks/秒 * 5 = 100 ticks）
@@ -290,8 +272,9 @@ public class PingOnline {
                 serverOnlineInfo = true;
                 player.sendMessage(ChatColor.GREEN + "服务器连接成功，正在为您处理...");
             } else {
-                player.sendMessage(ChatColor.RED + "无法连接服务器，请等待服务器重新上线");
+                player.sendMessage(ChatColor.RED + "无法连接服务器，联系服务器管理员");
                 serverOnlineInfo = false;
+                // plugin.silentPingTest();
             }
         }
     }
@@ -306,6 +289,9 @@ public class PingOnline {
     }
 
     public void sendInfoRequest(CommandSender sender) {
+        if(!serverOnlineInfo){
+            Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "logseq cmdpingtest");
+        }
         if(serverOnlineInfo){
             try {
                 InetAddress address = InetAddress.getByName(ip);
@@ -318,17 +304,15 @@ public class PingOnline {
                 sender.sendMessage(ChatColor.RED + "请求发送失败: " + e.getMessage());
             }
         } else {
+            // 重置远程服务器在线信息
+            memUsage = -1;
+            onlinePlayers = -1;
+            serverTPS = -1.0;
+            maxQuantity = -1;
+            quantityPercentage = -1.0;
             if(pionli){
-                // 重置远程服务器在线信息
-                memUsage = -1;
-                onlinePlayers = -1;
-                serverTPS = 1.1;
                 sender.sendMessage(ChatColor.RED + "服务器未在线，请稍后再试");
             } else {
-                // 重置远程服务器在线信息
-                memUsage = -1;
-                onlinePlayers = -1;
-                serverTPS = 1.1;
                 sender.sendMessage(ChatColor.YELLOW + "未开启服务器在线检测");
             }
         }
@@ -338,15 +322,23 @@ public class PingOnline {
     private void parseServerData(String data) {
         try {
             String[] parts = data.split(" ");
-            // 格式示例："LoginSequence-Data Memory:1024 Online:5 TPS:19.9"
+            // 格式示例："LoginSequence-Data Memory:1024 Online:5 TPS:19.9 MaxQuantity:20"
             // 调整索引位置（原代码分割后 parts[0] 是前缀）
-            memUsage = Integer.parseInt(parts[1].split(":")[1].replace("MB", ""));
-            onlinePlayers = Integer.parseInt(parts[2].split(":")[1]);
-            serverTPS = Double.parseDouble(parts[3].split(":")[1]);
+            memUsage = Integer.parseInt(parts[1].split(":")[1].replace("MB", "")); // 内存使用量
+            onlinePlayers = Integer.parseInt(parts[2].split(":")[1]); // 在线玩家数
+            serverTPS = Double.parseDouble(parts[3].split(":")[1]); // 服务器TPS
+            maxQuantity = Integer.parseInt(parts[4].split(":")[1]); // 最大玩家数
             plugin.getLogger().info("已更新服务器状态数据");
         } catch (Exception e) {
             plugin.getLogger().warning("数据解析失败: " + data);
         }
+        // 计算在线玩家百分比
+        quantityPercentage = (double) onlinePlayers / maxQuantity * 100;
+    }
+
+    // 检查服务器负载是否过高
+    public boolean isServerOverloaded() {
+        return quantityPercentage >= 90.0;
     }
 
     //  获取连接性测试状态
@@ -359,7 +351,7 @@ public class PingOnline {
         return serverOnlineInfo;
     }
 
-    // 静态获取服务器在线信息
+    //获取服务器在线信息
     public boolean isServerInfoGet(){
         boolean ret = false;
         if(serverOnlineInfo && pionli){
@@ -367,6 +359,7 @@ public class PingOnline {
         }
         return ret;
     }
+
     public static boolean isStaServerInfoGet(){
         boolean ret = false;
         if(serverOnlineInfo && pionli){
@@ -374,6 +367,11 @@ public class PingOnline {
         }
         return ret;
     }
+
+    public static void setTestingServer(boolean eTestingServer){
+        testingServer = eTestingServer;
+    }
+
     private void sayLog(String s) {
         CommandSender sender = Bukkit.getConsoleSender();
         sender.sendMessage(s);
@@ -403,5 +401,13 @@ public class PingOnline {
 
     public DatagramSocket getSocket() {
         return this.socket;
+    }
+
+    public int getMaxQuantity() {
+        return maxQuantity;
+    }
+
+    public double getQuantityPercentage() {
+        return quantityPercentage;
     }
 }

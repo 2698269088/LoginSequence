@@ -1,0 +1,11 @@
+[
+  {
+    "playerName": "string",
+    "uuid": "string",
+    "firstJoinTime": "1970-01-01T00:00:00Z",
+    "lastJoinTime": "1970-01-01T00:00:00Z",
+    "lastLoginTime": "1970-01-01T00:00:00Z",
+    "registered": false,
+    "password": "NaN"
+  }
+]

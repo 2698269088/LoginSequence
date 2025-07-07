@@ -1,18 +1,67 @@
+# 文件路径：src/main/resources/plugin.yml
 name: LoginSequence
-version: '1.4.3'
+version: '1.7.3'
 main: top.mcocet.loginSequence.LoginSequence
 api-version: '1.20'
 description: A plugin to manage player login sequence and perform connectivity tests.
 author: MCOCET
-folia-supported: true
+folia-supported: false
 
 commands:
   logseq:
-    description: Main command for LoginSequence plugin
-    usage: /<command> [subcommand]
+    description: 主命令用于管理登录序列和服务器状态
+    usage: /<command> [子命令]
+    aliases: [ls]
     permission: logseq.admin
     children:
       ping:
-        description: Perform a manual connectivity test
+        description: 手动测试服务器连通性
         usage: /logseq ping
         permission: logseq.ping
+      info:
+        description: 请求远程服务器状态数据
+        usage: /logseq info
+        permission: logseq.info
+      stavie:
+        description: 查看服务器实时状态
+        usage: /logseq stavie
+        permission: logseq.stavie
+      help:
+        description: 显示帮助信息
+        usage: /logseq help
+        permission: logseq.help
+      cmdpingtest:
+        description: 执行静默连通性测试（仅控制台）
+        usage: /logseq cmdpingtest
+        permission: logseq.cmdpingtest
+      list:
+        description: 查看JSON存储的玩家数据
+        usage: /logseq list
+        permission: logseq.list
+
+permissions:
+  logseq.admin:
+    description: 所有登录序列插件的管理权限
+    default: op
+    children:
+      logseq.ping: true
+      logseq.info: true
+      logseq.stavie: true
+      logseq.help: true
+      logseq.cmdpingtest: true
+      logseq.list: true
+  logseq.ping:
+    description: 执行连通性测试的权限
+    default: false
+  logseq.info:
+    description: 请求服务器状态数据的权限
+    default: false
+  logseq.stavie:
+    description: 查看服务器实时状态的权限
+    default: false
+  logseq.cmdpingtest:
+    description: 执行静默连通性测试的权限
+    default: false
+  logseq.list:
+    description: 查看JSON玩家数据的权限
+    default: false

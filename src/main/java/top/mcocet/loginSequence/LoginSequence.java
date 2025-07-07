@@ -1,14 +1,21 @@
 package top.mcocet.loginSequence;
 
+import java.io.File;
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
+import java.time.Instant;
 import java.util.LinkedList;
+import java.util.Optional;
 import java.util.Queue;
+import java.util.logging.Level;
+
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.ConsoleCommandSender;
+import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
@@ -21,38 +28,66 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.bukkit.scoreboard.Objective;
 import org.bukkit.scoreboard.Scoreboard;
+
+import top.mcocet.loginSequence.json.PlayerDataManager;
+import top.mcocet.loginSequence.json.PlayerInfo;
 import top.mcocet.loginSequence.tasks.CheckingTask;
 import top.mcocet.loginSequence.tasks.CommandTask;
 import top.mcocet.loginSequence.tasks.PingOnline;
+import top.mcocet.loginSequence.tasks.SecureLogin;
+import top.mcocet.loginSequence.tasks.ScoreboardTask;
+
+import static top.mcocet.loginSequence.FillTask.readConfig;
 
 public class LoginSequence extends JavaPlugin implements Listener {
     private final Queue<Player> queue = new LinkedList(); // 玩家排队队列
     private String targetServer; // 目标服务器
     private boolean isTransferring = false; // 是否正在转移玩家
+    private boolean piEula = false; // 玩家数据存储开关
     private CheckingTask checkingTask; // 检查任务实例
     private PingOnline pingOnline; // 在线检测实例
-    private CommandTask commandTask;
+    private CommandTask commandTask; // 命令任务实例
+    private SecureLogin secureLogin; // 登录验证实例
+    private PlayerDataManager playerDataManager; // 玩家数据管理实例
+    private PlayerInfo playerInfo; // 玩家信息
+    private ScoreboardTask scoreboardTask; // 计分板任务实例
 
     public void onEnable() {
         // logo
         sayLog(ChatColor.AQUA+"    "+" "+ChatColor.BLUE+" __ "+" "+ChatColor.YELLOW+" ___");
         sayLog(ChatColor.AQUA+"|   "+" "+ChatColor.BLUE+"(__ "+" "+ChatColor.YELLOW+"|___");
-        sayLog(ChatColor.AQUA+"|___"+" "+ChatColor.BLUE+" __)"+" "+ChatColor.YELLOW+"|___"+ChatColor.GREEN+"    LoginSequence v1.4.3");
+        sayLog(ChatColor.AQUA+"|___"+" "+ChatColor.BLUE+" __)"+" "+ChatColor.YELLOW+"|___"+ChatColor.GREEN+"    LoginSequence v1.7.3");
         sayLog("");
         // 注册事件监听器
         Bukkit.getPluginManager().registerEvents(this, this);
         // 注册BungeeCord插件通道
         getServer().getMessenger().registerOutgoingPluginChannel(this, "BungeeCord");
         // 初始化任务
-        FillTask.initConfig(this);
-        checkingTask = new CheckingTask(this);
-        pingOnline = new PingOnline(this);
-        commandTask = new CommandTask(this, pingOnline);
+        FillTask.initConfig(this); // 初始化配置文件
+        FillTask.readConfig(this); // 读取配置文件
+        checkingTask = new CheckingTask(this); // 初始化BC跳转
+        pingOnline = new PingOnline(this); // 初始化在线检测
+        commandTask = new CommandTask(this, pingOnline); // 初始化指令
+        secureLogin = new SecureLogin(this); // 初始化安全登录
+        playerDataManager = new PlayerDataManager(); // 初始化玩家数据管理
+        playerInfo = new PlayerInfo(); // 初始化玩家信息
+        scoreboardTask = new ScoreboardTask(this, pingOnline, queue); // 初始化计分板任务
 
         // 初始化指令
         getCommand("logseq").setExecutor(commandTask);
+        getCommand("ls").setExecutor(commandTask);
 
         getLogger().info("LoginSequence已启用！");
+
+        piEula = FillTask.piEula;
+
+        Bukkit.getPluginManager().registerEvents(new Listener() {
+            @EventHandler
+            public void onPlayerJoin(PlayerJoinEvent event) {
+                secureLogin.onPlayerJoin(event);
+                scoreboardTask.handlePlayerJoin(event); // 处理计分板初始化
+            }
+        }, this);
 
         // 如果启用了连接性测试，则开始测试
         if (pingOnline.isConnectivityTestEnabled()) {
@@ -61,6 +96,13 @@ public class LoginSequence extends JavaPlugin implements Listener {
             isTransferring = false;
             checkingTask.processQueue();
         }
+
+        Bukkit.getPluginManager().registerEvents(new Listener() {
+            @EventHandler
+            public void onPlayerJoin(PlayerJoinEvent event) {
+                secureLogin.onPlayerJoin(event);
+            }
+        }, this);
 
         // 定时通知玩家排队位置
         (new BukkitRunnable() {
@@ -79,9 +121,11 @@ public class LoginSequence extends JavaPlugin implements Listener {
     // 玩家加入事件处理
     @EventHandler
     public void onPlayerJoin(PlayerJoinEvent event) {
+        // 确保安全登录模块初始化
+        secureLogin.initIfNeeded();
         // 玩家加入后自动获取远程服务器状态
-        if (pingOnline.isServerInfoGet()) {
-            Bukkit.getServer().dispatchCommand(Bukkit.getConsoleSender(), "logseq info");
+        if (pingOnline.isGetServerOnlineInfo()) {
+            pingOnline.sendInfoRequest(event.getPlayer());
         }
 
         Player player = event.getPlayer();
@@ -97,6 +141,37 @@ public class LoginSequence extends JavaPlugin implements Listener {
                     player.addPotionEffect(new PotionEffect(PotionEffectType.BLINDNESS, Integer.MAX_VALUE, 1, false, false));
                     player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0, false, false));
                     player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, Integer.MAX_VALUE, 255, false, false));
+                }
+
+                // 存储基础数据
+                Player player = event.getPlayer();
+                String playerName = player.getName();
+                String uuid = player.getUniqueId().toString();
+                String playerIP = player.getAddress().getAddress().getHostAddress();
+                Optional<PlayerInfo> existingPlayer = PlayerDataManager.getPlayer(uuid);
+                if (!existingPlayer.isPresent()) {
+                    PlayerInfo info = new PlayerInfo();
+                    info.setPlayerName(playerName);
+                    info.setUuid(uuid);
+                    // 仅在piEula启用时记录敏感信息
+                    if (FillTask.piEula) {
+                        String currentTime = Instant.now().toString();
+                        info.setFirstJoinTime(currentTime);
+                        info.setLastJoinTime(currentTime);
+                        info.updateLoginIP(playerIP);
+                    }
+                    PlayerDataManager.addPlayer(info);
+                    PlayerDataManager.asyncSave();
+                    LoginSequence.this.getLogger().info("已异步存储新玩家数据: " + playerName);
+                } else {
+                    PlayerInfo info = existingPlayer.get();
+                    info.updateLastJoinTime(); // 可能不更新时间
+                    // 仅在pi_Eula启用时更新
+                    if (FillTask.piEula) {
+                        info.updateLoginIP(playerIP);
+                    }
+                    PlayerDataManager.asyncSave();
+                    LoginSequence.this.getLogger().info("已异步更新玩家最后加入时间: " + playerName);
                 }
             }
         }.runTaskLater(this, 1L); // 延迟 1 tick 执行
@@ -150,6 +225,7 @@ public class LoginSequence extends JavaPlugin implements Listener {
         sender.sendMessage(ChatColor.GOLD + "/logseq info" + ChatColor.WHITE + " - 请求服务器状态数据");
         sender.sendMessage(ChatColor.GOLD + "/logseq stavie" + ChatColor.WHITE + " - 查看服务器实时状态");
         sender.sendMessage(ChatColor.GOLD + "/logseq help" + ChatColor.WHITE + " - 显示本帮助信息");
+        sender.sendMessage(ChatColor.GOLD + "/logseq list" + ChatColor.WHITE + " - 查看玩家数据列表");
     }
 
     // 状态查看处理方法
@@ -162,10 +238,12 @@ public class LoginSequence extends JavaPlugin implements Listener {
         String status = String.format(
                 ChatColor.AQUA + "服务器状态:\n" +
                         ChatColor.WHITE+"[LoginSequence Info] " + ChatColor.GREEN + "内存占用: %dMB\n" +
-                        ChatColor.WHITE+"[LoginSequence Info] " + ChatColor.GREEN + "在线玩家: %d\n" +
+                        ChatColor.WHITE+"[LoginSequence Info] " + ChatColor.GREEN + "在线玩家: %d/%d (%.1f%%)\n" +
                         ChatColor.WHITE+"[LoginSequence Info] " + ChatColor.GREEN + "TPS: %.1f",
                 pingOnline.getMemUsage(),
                 pingOnline.getOnlinePlayers(),
+                pingOnline.getMaxQuantity(),
+                pingOnline.getQuantityPercentage(),
                 pingOnline.getServerTPS()
         );
         sender.sendMessage(status);
