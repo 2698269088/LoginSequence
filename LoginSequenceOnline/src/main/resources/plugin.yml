@@ -1,0 +1,11 @@
+name: LoginSequenceOnline
+version: '1.4'
+main: top.mcocet.loginSequenceOnline.LoginSequenceOnline
+api-version: '1.20'
+author: MCOCET
+description: 提供UDP通信以支持在线检测和外部获取服务器信息（如TPS、内存使用等）
+load-before:
+  - SomeOtherPlugin
+commands:
+permissions:
+folia-supported: true
