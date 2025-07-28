@@ -5,6 +5,7 @@ top\mcocet\loginSequence\tasks\SecureLogin$2.class
 top\mcocet\loginSequence\json\PlayerDataManager.class
 top\mcocet\loginSequence\LoginSequence$5.class
 top\mcocet\loginSequence\tasks\CommandTask.class
+top\mcocet\loginSequence\tasks\commands\LoginCommand.class
 top\mcocet\loginSequence\bev\UPLink.class
 top\mcocet\loginSequence\tasks\PingOnline$1.class
 top\mcocet\loginSequence\tasks\PingOnline$ServerConnectivityTask.class
@@ -19,7 +20,10 @@ top\mcocet\loginSequence\bev\UDPLink.class
 top\mcocet\loginSequence\tasks\CheckingTask$1.class
 top\mcocet\loginSequence\LoginSequence$3.class
 top\mcocet\loginSequence\tasks\SecureLogin$1.class
+top\mcocet\loginSequence\tasks\Login.class
 top\mcocet\loginSequence\LoginSequence.class
+top\mcocet\loginSequence\tasks\commands\RegisterCommand.class
 top\mcocet\loginSequence\json\PlayerInfo.class
 top\mcocet\loginSequence\LoginSequence$1.class
 top\mcocet\loginSequence\tasks\SecureLogin.class
+top\mcocet\loginSequence\tasks\Register.class

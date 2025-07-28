@@ -21,13 +21,17 @@ public class CheckingTask {
 
     private static final String SERVER_CONNECT_COMMAND = "Connect";
     private final LoginSequence loginSequence;
-    private final PingOnline pingOnline; // 新增PingOnline实例引用
+    private PingOnline pingOnline; // PingOnline实例引用
     private static final String serverName = PingOnline.getServerName(); // serverName定义
 
     public CheckingTask(LoginSequence loginSequence) {
         this.loginSequence = loginSequence;
-        this.pingOnline = new PingOnline(loginSequence); // 初始化PingOnline实例并传递插件引用
         this.upLink = new UPLink(loginSequence); // 初始化 UPLink
+    }
+
+    // 添加设置PingOnline实例的方法
+    public void setPingOnline(PingOnline pingOnline) {
+        this.pingOnline = pingOnline;
     }
 
     public void processQueue() {

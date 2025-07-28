@@ -39,7 +39,8 @@ public class SecureLogin {
 
     public SecureLogin(LoginSequence plugin) {
         this.plugin = plugin;
-        //initFill(plugin);
+        initFill(plugin); // 确保在构造函数中初始化配置
+        initialized = true; // 标记为已初始化
 
         // 注册监听器
         plugin.getServer().getPluginManager().registerEvents(new Listener() {
@@ -101,6 +102,9 @@ public class SecureLogin {
     }
 
     public void onPlayerJoin(PlayerJoinEvent event) {
+        if (!sl) {
+            return;
+        }
         Player player = event.getPlayer();
         UUID playerId = player.getUniqueId();
 
@@ -177,11 +181,13 @@ public class SecureLogin {
             e.printStackTrace();
         }
     }
-
+/*
     public void initIfNeeded() {
         if (!initialized) {
             initFill(plugin);
             initialized = true;
         }
     }
+
+ */
 }

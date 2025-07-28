@@ -12,10 +12,12 @@ import top.mcocet.loginSequence.FillTask;
 import top.mcocet.loginSequence.LoginSequence;
 import top.mcocet.loginSequence.json.PlayerDataManager;
 import top.mcocet.loginSequence.json.PlayerInfo;
+import top.mcocet.loginSequence.bev.UPLink;
 
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
 
@@ -71,10 +73,37 @@ public class CommandTask implements CommandExecutor {
                 handleListCommand(sender);
                 return true;
 
+            case "login":
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(ChatColor.RED + "该指令只能由玩家执行");
+                    return true;
+                }
+                if (args.length < 1) {
+                    sender.sendMessage(ChatColor.RED + "用法: /login <密码>");
+                    return false;
+                }
+                String password = args[0];
+                Login.handleLogin((Player) sender, password);
+                return true;
+
+            case "register":
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(ChatColor.RED + "该指令只能由玩家执行");
+                    return true;
+                }
+                Register.handleRegister((Player) sender, Arrays.copyOfRange(args, 0, args.length));
+                return true;
+
+            case "remov":
+                if (!checkPermission(sender, "logseq.remov")) return true;
+                handleRemovCommand(sender, args);
+                return true;
+
             case "link":
                 if (sender instanceof Player) {
                     Player player = (Player) sender;
                     // 直接连接子服务器
+                    pingOnline.sendPlayerPacket(player.getName());
                     try (ByteArrayOutputStream b = new ByteArrayOutputStream();
                          DataOutputStream out = new DataOutputStream(b)) {
                         out.writeUTF("Connect");
@@ -102,6 +131,35 @@ public class CommandTask implements CommandExecutor {
         return true;
     }
 
+    private void handleRemovCommand(CommandSender sender, String[] args) {
+        if (args.length == 1) {
+            String playerName = args[1];
+            resetPlayerLock(playerName);
+            sender.sendMessage(ChatColor.GREEN + "已解除玩家 " + playerName + " 的登录限制");
+        } else {
+            resetAllPlayerLocks();
+            sender.sendMessage(ChatColor.GREEN + "已解除所有玩家的登录限制");
+        }
+    }
+
+    private void resetPlayerLock(String playerName) {
+        PlayerDataManager.getAllPlayers().forEach(info -> {
+            if (info.getPlayerName().equals(playerName)) {
+                info.setFailedAttempts(0);
+                info.setLastFailedAttemptTime(0);
+            }
+        });
+        PlayerDataManager.asyncSave();
+    }
+
+    private void resetAllPlayerLocks() {
+        PlayerDataManager.getAllPlayers().forEach(info -> {
+            info.setFailedAttempts(0);
+            info.setLastFailedAttemptTime(0);
+        });
+        PlayerDataManager.asyncSave();
+    }
+
     private void showHelp(CommandSender sender) {
         sender.sendMessage(ChatColor.AQUA + "==== LoginSequence 指令帮助 ====");
         sender.sendMessage(ChatColor.GOLD + "/logseq help" + ChatColor.WHITE + " - 显示帮助信息");
@@ -109,6 +167,9 @@ public class CommandTask implements CommandExecutor {
         sender.sendMessage(ChatColor.GOLD + "/logseq info" + ChatColor.WHITE + " - 请求服务器状态数据");
         sender.sendMessage(ChatColor.GOLD + "/logseq stavie" + ChatColor.WHITE + " - 查看服务器实时状态");
         sender.sendMessage(ChatColor.GOLD + "/logseq list" + ChatColor.WHITE + " - 查看玩家数据列表");
+        sender.sendMessage(ChatColor.GOLD + "/logseq link" + ChatColor.WHITE + " - 直接连接服务器");
+        sender.sendMessage(ChatColor.GOLD + "/logseq register" + ChatColor.WHITE + " - 注册账户");
+        sender.sendMessage(ChatColor.GOLD + "/logseq login" + ChatColor.WHITE + " - 登录账户");
     }
 
     private void handleStatusRequest(CommandSender sender) {

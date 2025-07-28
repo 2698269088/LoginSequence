@@ -5,7 +5,11 @@ C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\json
 C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\json\PlayerInfo.java
 C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\LoginSequence.java
 C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\tasks\CheckingTask.java
+C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\tasks\commands\LoginCommand.java
+C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\tasks\commands\RegisterCommand.java
 C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\tasks\CommandTask.java
+C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\tasks\Login.java
 C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\tasks\PingOnline.java
+C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\tasks\Register.java
 C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\tasks\ScoreboardTask.java
 C:\Users\26982\Desktop\LoginSequence\src\main\java\top\mcocet\loginSequence\tasks\SecureLogin.java
