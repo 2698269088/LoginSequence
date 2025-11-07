@@ -37,29 +37,26 @@ public class Login {
         if (playerInfo.verifyPassword(password)) {
             // 登录成功
             player.sendMessage(ChatColor.GREEN + "登录成功！");
-            // 将玩家加入队列
-            LoginSequence plugin = (LoginSequence) player.getServer().getPluginManager().getPlugin("LoginSequence");
-            if (plugin != null) {
-                player.sendMessage(ChatColor.AQUA + "玩家 " + player.getName() + " 加入了服务器！");
-                plugin.getQueue().add(player);
-                player.sendMessage(ChatColor.YELLOW + "您已加入服务器排队队列，当前排队位置：" + plugin.getQueue().size());
-                player.sendTitle(ChatColor.AQUA + "等待连接服务器，当前排队位置：" + ChatColor.YELLOW + plugin.getQueue().size(), "", 0, 100, 0);
-
-                // 只有在服务器在线时才处理队列
-                if (plugin.getPingOnline().isGetServerOnlineInfo() || !FillTask.pionli) {
-                    if (plugin.getCheckingTask() != null) {
-                        plugin.getCheckingTask().notifyQueuePositions();
-                        plugin.processQueue();
-                    }
-                } else {
-                    player.sendMessage(ChatColor.RED + "服务器当前不在线，请稍后再试");
-                }
-            }
+            // 重置失败次数
+            playerInfo.setFailedAttempts(0);
+            playerInfo.setLastFailedAttemptTime(0);
+            // 更新最后登录时间
+            playerInfo.setLastLoginTime(java.time.Instant.now().toString());
+            PlayerDataManager.asyncSave();
             return true;
         } else {
             // 登录失败，更新错误计数器
             playerInfo.increaseFailedAttempts();
-            player.sendMessage(ChatColor.RED + "密码错误！剩余尝试次数: " + (5 - playerInfo.getFailedAttempts()));
+            int remainingAttempts = 5 - playerInfo.getFailedAttempts();
+            player.sendMessage(ChatColor.RED + "密码错误！剩余尝试次数: " + remainingAttempts);
+            
+            // 如果失败次数达到上限，锁定账户
+            if (remainingAttempts <= 0) {
+                player.sendMessage(ChatColor.RED + "密码错误次数过多，账户已被锁定30分钟！");
+                // 可以选择踢出玩家
+                // player.kickPlayer(ChatColor.RED + "密码错误次数过多，账户已被锁定30分钟！");
+            }
+            PlayerDataManager.asyncSave();
             return false;
         }
     }

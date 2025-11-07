@@ -1,5 +1,5 @@
 name: LoginSequence
-version: '1.8.4'
+version: '1.9'
 main: top.mcocet.loginSequence.LoginSequence
 api-version: '1.20'
 description: A plugin to manage player login sequence and perform connectivity tests.
@@ -55,6 +55,9 @@ commands:
   login:
     description: 登录到您的账户
     usage: /login <密码>
+  logout:
+    description: 登出您的账户
+    usage: /logout
 
 permissions:
   logseq.admin:

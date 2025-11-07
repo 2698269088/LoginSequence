@@ -5,6 +5,7 @@ import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
 import top.mcocet.loginSequence.LoginSequence;
 import top.mcocet.loginSequence.tasks.Register;
 
@@ -22,6 +23,51 @@ public class RegisterCommand implements CommandExecutor {
             return true;
         }
 
-        return Register.handleRegister((Player) sender, args);
+        Player player = (Player) sender;
+        
+        // 检查玩家是否已经登录（注册后会自动登录）
+        if (!LoginSequence.WaitLogin.contains(player)) {
+            player.sendMessage(ChatColor.RED + "你已经登录了!");
+            return true;
+        }
+
+        // 处理注册
+        boolean success = Register.handleRegister(player, args);
+        
+        if (success) {
+            // 注册成功后自动登录
+            // 从等待登录列表中移除
+            LoginSequence.WaitLogin.remove(player);
+            
+            player.sendMessage(ChatColor.GREEN + "注册成功！你已自动登录。");
+            
+            // 启动一个短暂的延迟，然后将玩家加入队列
+            new BukkitRunnable() {
+                @Override
+                public void run() {
+                    plugin.getQueue().add(player);
+                    player.sendMessage(ChatColor.YELLOW + "您已加入服务器排队队列，当前排队位置：" + plugin.getQueue().size());
+                    player.sendTitle(ChatColor.AQUA + "等待连接服务器，当前排队位置：" + ChatColor.YELLOW + plugin.getQueue().size(), "", 0, 100, 0);
+
+                    // 只有在服务器在线时才处理队列
+                    if (plugin.getPingOnline().isGetServerOnlineInfo() || !top.mcocet.loginSequence.FillTask.pionli) {
+                        if (plugin.getCheckingTask() != null) {
+                            plugin.getCheckingTask().notifyQueuePositions();
+                            plugin.processQueue();
+                        }
+                    } else {
+                        player.sendMessage(ChatColor.RED + "服务器当前不在线，请稍后再试");
+                    }
+                    
+                    // 移除玩家的限制效果
+                    player.removePotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS);
+                    player.removePotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY);
+                    player.removePotionEffect(org.bukkit.potion.PotionEffectType.SLOW);
+                    player.setGameMode(org.bukkit.GameMode.SURVIVAL);
+                }
+            }.runTaskLater(plugin, 20L); // 延迟1秒执行
+        }
+        
+        return true;
     }
 }

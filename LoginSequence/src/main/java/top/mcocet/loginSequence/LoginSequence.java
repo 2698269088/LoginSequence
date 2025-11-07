@@ -5,13 +5,8 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 import java.time.Instant;
-import java.util.LinkedList;
-import java.util.Optional;
-import java.util.Queue;
+import java.util.*;
 import java.util.logging.Level;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -40,6 +35,9 @@ import top.mcocet.loginSequence.tasks.*;
 import top.mcocet.loginSequence.tasks.commands.*;
 
 import static top.mcocet.loginSequence.FillTask.readConfig;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.config.Configuration;
 
 
 public class LoginSequence extends JavaPlugin implements Listener {
@@ -56,12 +54,16 @@ public class LoginSequence extends JavaPlugin implements Listener {
     private ScoreboardTask scoreboardTask; // 计分板任务实例
     private LoginCommand loginCommand; // 登录命令实例
     private RegisterCommand registerCommand; // 注册命令实例
+    private LogoutCommand logoutCommand; // 登出命令实例
+    
+    // 等待登录的玩家列表
+    public static ArrayList<Player> WaitLogin = new ArrayList<>();
 
     public void onEnable() {
         // logo
         sayLog(ChatColor.AQUA+"    "+" "+ChatColor.BLUE+" __ "+" "+ChatColor.YELLOW+" ___");
         sayLog(ChatColor.AQUA+"|   "+" "+ChatColor.BLUE+"(__ "+" "+ChatColor.YELLOW+"|___");
-        sayLog(ChatColor.AQUA+"|___"+" "+ChatColor.BLUE+" __)"+" "+ChatColor.YELLOW+"|___"+ChatColor.GREEN+"    LoginSequence v1.8.4");
+        sayLog(ChatColor.AQUA+"|___"+" "+ChatColor.BLUE+" __)"+" "+ChatColor.YELLOW+"|___"+ChatColor.GREEN+"    LoginSequence v1.9");
         sayLog("");
         // 注册事件监听器和BungeeCord通道
         Bukkit.getPluginManager().registerEvents(this, this);
@@ -79,12 +81,23 @@ public class LoginSequence extends JavaPlugin implements Listener {
         scoreboardTask = new ScoreboardTask(this, pingOnline, queue); // 初始化计分板任务
         loginCommand = new LoginCommand(this); // 创建登录指令
         registerCommand = new RegisterCommand(this); // 创建注册指令
+        logoutCommand = new LogoutCommand(this); // 创建登出指令
 
         // 初始化指令
         getCommand("logseq").setExecutor(commandTask);
         getCommand("ls").setExecutor(commandTask);
         getCommand("login").setExecutor(loginCommand);
         getCommand("register").setExecutor(registerCommand);
+        getCommand("logout").setExecutor(logoutCommand);
+        
+        // 添加日志过滤器
+        LoggerContext context = (LoggerContext) LogManager.getContext(false);
+        Configuration config = context.getConfiguration();
+        config.getLoggerConfig(LogManager.ROOT_LOGGER_NAME).addFilter(new LogFilter());
+        context.updateLoggers();
+        
+        // 注册玩家认证监听器
+        getServer().getPluginManager().registerEvents(new PlayerAuthListener(), this);
 
         getLogger().info("LoginSequence已启用！");
 
@@ -200,11 +213,19 @@ public class LoginSequence extends JavaPlugin implements Listener {
                     if (playerInfo.isPresent() && playerInfo.get().isRegistered()) {
                         // 已注册玩家，提示登录
                         player.sendMessage(ChatColor.YELLOW + "请使用 /login <密码> 登录");
+                        // 添加玩家到等待登录列表
+                        WaitLogin.add(player);
+                        // 启动登录提示任务
+                        startLoginPromptTask(player, true); // true表示已注册
                         // 不将玩家加入队列，直到登录成功
                         return;
                     } else {
                         // 未注册玩家，提示注册
                         player.sendMessage(ChatColor.YELLOW + "请使用 /register <密码> [验证密码] 注册账号");
+                        // 添加玩家到等待登录列表
+                        WaitLogin.add(player);
+                        // 启动注册提示任务
+                        startLoginPromptTask(player, false); // false表示未注册
                         // 不将玩家加入队列，直到注册并登录成功
                         return;
                     }
@@ -316,6 +337,32 @@ public class LoginSequence extends JavaPlugin implements Listener {
     public void silentPingTest() {
         boolean success = pingOnline.silentPingCheck();
         // 静默模式不输出任何日志
+    }
+
+    /**
+     * 启动登录提示任务
+     * @param player 玩家
+     * @param isRegistered 是否已注册
+     */
+    private void startLoginPromptTask(Player player, boolean isRegistered) {
+        new BukkitRunnable() {
+            @Override
+            public void run() {
+                while (player.isOnline() && WaitLogin.contains(player)) {
+                    if (isRegistered) {
+                        player.sendTitle(ChatColor.YELLOW + "请使用 /login <密码> 登录!", "", 10, 40, 10);
+                    } else {
+                        player.sendTitle(ChatColor.YELLOW + "请使用 /register <密码> [验证密码] 注册!", "", 10, 40, 10);
+                    }
+                    try {
+                        Thread.sleep(1000L);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        }.runTaskAsynchronously(this);
     }
 
     private void sayLog(String s) {
