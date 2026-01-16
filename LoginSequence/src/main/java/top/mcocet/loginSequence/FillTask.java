@@ -32,6 +32,10 @@ public class FillTask {
     public static boolean sl = false; // 是否启用安全登录
     public static boolean pwl = false; // 是否启用密码登录
     public static boolean piEula = false; // 玩家数据存储开关，即pi_eula协议
+    public static boolean enableDelayTransfer; // 是否启用延迟跳转模式
+    public static String delayTransferCommand; // 延迟跳转模式下要执行的指令
+    public static int delayTransferWaitTime; // 延迟跳转等待时间（秒）
+    public static boolean enableCommandQueue; // 是否启用命令加入队列模式
 
     public static void initConfig(JavaPlugin plugin) {
         // 获取配置文件以及其他文件
@@ -101,6 +105,10 @@ public class FillTask {
             sl = yaml.getBoolean("sl"); // 是否启用安全登录
             pwl = yaml.getBoolean("pwl"); // 是否启用密码登录
             piEula = yaml.getBoolean("pi_eula"); // 玩家数据存储开关，即pi_eula协议
+            enableDelayTransfer = yaml.getBoolean("enable_delay_transfer"); // 是否启用延迟跳转模式
+            delayTransferCommand = yaml.getString("delay_transfer_command", "msg {player} 请等待服务器切换"); // 延迟跳转模式下要执行的指令
+            delayTransferWaitTime = yaml.getInt("delay_transfer_wait_time", 30); // 延迟跳转等待时间（秒）
+            enableCommandQueue = yaml.getBoolean("enable_command_queue"); // 是否启用命令加入队列模式
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "配置文件加载异常", e); // 增强异常处理
         }
@@ -124,6 +132,18 @@ public class FillTask {
             plugin.getLogger().info("BC/Velocity插件监听地址: " + bevip + ":" + bevport);
         } else {
             plugin.getLogger().info("未启用BC/Velocity插件跳转");
+        }
+        if(enableDelayTransfer){
+            plugin.getLogger().info("已启用延迟跳转模式");
+            plugin.getLogger().info("延迟跳转指令: " + delayTransferCommand);
+            plugin.getLogger().info("延迟等待时间: " + delayTransferWaitTime + "秒");
+        } else {
+            plugin.getLogger().info("未启用延迟跳转模式");
+        }
+        if(enableCommandQueue){
+            plugin.getLogger().info("已启用命令加入队列模式");
+        } else {
+            plugin.getLogger().info("未启用命令加入队列模式");
         }
     }
 

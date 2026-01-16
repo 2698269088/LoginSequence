@@ -102,8 +102,10 @@ public class CommandTask implements CommandExecutor {
             case "link":
                 if (sender instanceof Player) {
                     Player player = (Player) sender;
-                    // 直接连接子服务器
-                    pingOnline.sendPlayerPacket(player.getName());
+                    // 只有在启用了在线检测时才发送 UDP 包
+                    if (top.mcocet.loginSequence.FillTask.pionli) {
+                        pingOnline.sendPlayerPacket(player.getName());
+                    }
                     try (ByteArrayOutputStream b = new ByteArrayOutputStream();
                          DataOutputStream out = new DataOutputStream(b)) {
                         out.writeUTF("Connect");
@@ -117,6 +119,67 @@ public class CommandTask implements CommandExecutor {
                 }
                 sender.sendMessage(ChatColor.RED + "该指令只能由玩家执行");
                 return true;
+
+            case "logser":
+                if (!(sender instanceof Player)) {
+                    sender.sendMessage(ChatColor.RED + "该指令只能由玩家执行");
+                    return true;
+                }
+                Player player = (Player) sender;
+                
+                // 检查是否启用了命令队列模式
+                if (!FillTask.enableCommandQueue) {
+                    player.sendMessage(ChatColor.RED + "服务器未启用命令加入队列模式");
+                    return true;
+                }
+                
+                // 将玩家加入队列
+                plugin.addToQueue(player);
+                return true;
+
+            case "linkout":
+                if (sender instanceof Player) {
+                    Player pl = (Player) sender;
+                    
+                    // 检查是否启用了延迟跳转模式
+                    if (!FillTask.enableDelayTransfer) {
+                        pl.sendMessage(ChatColor.RED + "服务器未启用延迟跳转模式，无法使用此命令");
+                        return true;
+                    }
+                    
+                    // 检查玩家是否轮到加入服务器
+                    if (!isPlayerTurnToJoin(pl, plugin)) {
+                        pl.sendMessage(ChatColor.RED + "还未轮到您加入服务器，无法使用此命令");
+                        return true;
+                    }
+                    
+                    // 检查参数
+                    if (args.length < 2) { // args[0]是"linkout", args[1]是服务器名称
+                        pl.sendMessage(ChatColor.RED + "用法: /logseq linkout [服务器名称]");
+                        return true;
+                    }
+                    
+                    String targetServer = args[1];
+                    
+                    // 只有在启用了在线检测时才发送 UDP 包
+                    if (top.mcocet.loginSequence.FillTask.pionli) {
+                        pingOnline.sendPlayerPacket(pl.getName());
+                    }
+                    
+                    try (ByteArrayOutputStream b = new ByteArrayOutputStream();
+                         DataOutputStream out = new DataOutputStream(b)) {
+                        out.writeUTF("Connect");
+                        out.writeUTF(targetServer);
+                        pl.sendPluginMessage(plugin, "BungeeCord", b.toByteArray());
+                    } catch (IOException e) {
+                        plugin.getLogger().log(java.util.logging.Level.SEVERE, "数据流操作异常", e);
+                        pl.sendMessage(ChatColor.AQUA + "[Server]: " + ChatColor.RED + "无法连接到服务器，请稍后再试。");
+                    }
+                    return true;
+                }
+                sender.sendMessage(ChatColor.RED + "该指令只能由玩家执行");
+                return true;
+
             default:
                 sender.sendMessage(ChatColor.RED + "未知的子命令");
                 return false;
@@ -168,8 +231,10 @@ public class CommandTask implements CommandExecutor {
         sender.sendMessage(ChatColor.GOLD + "/logseq stavie" + ChatColor.WHITE + " - 查看服务器实时状态");
         sender.sendMessage(ChatColor.GOLD + "/logseq list" + ChatColor.WHITE + " - 查看玩家数据列表");
         sender.sendMessage(ChatColor.GOLD + "/logseq link" + ChatColor.WHITE + " - 直接连接服务器");
+        sender.sendMessage(ChatColor.GOLD + "/logseq linkout" + ChatColor.WHITE + " - 跳转到指定服务器（仅在延迟跳转模式下可用）");
         sender.sendMessage(ChatColor.GOLD + "/logseq register" + ChatColor.WHITE + " - 注册账户");
         sender.sendMessage(ChatColor.GOLD + "/logseq login" + ChatColor.WHITE + " - 登录账户");
+        sender.sendMessage(ChatColor.GOLD + "/logseq logser" + ChatColor.WHITE + " - 加入排队队列（仅在启用命令队列模式时有效）");
     }
 
     private void handleStatusRequest(CommandSender sender) {
@@ -210,5 +275,18 @@ public class CommandTask implements CommandExecutor {
                     info.isRegistered() ? "已注册" : "未注册"
             ));
         }
+    }
+    
+    /**
+     * 检查玩家是否轮到加入服务器
+     * @param player 玩家
+     * @param plugin 插件实例
+     * @return 是否轮到该玩家
+     */
+    private boolean isPlayerTurnToJoin(Player player, LoginSequence plugin) {
+        // 在延迟跳转模式下，判断玩家是否轮到加入服务器
+        // 使用等待状态Map来判断
+        Integer status = plugin.getPlayerWaitStatus().get(player.getName());
+        return status != null && status == 1;
     }
 }

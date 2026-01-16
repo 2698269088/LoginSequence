@@ -32,3 +32,17 @@ pwl: false
 # 重要提示：开启该选项会记录玩家数据，例如玩家登录时间，登录IP
 # 如果您服务器的玩家允许您这么做，或者您愿意承担相应的法律风险，请将此选项设置为true
 pi_eula: false
+
+############### 此项目为高级功能配置 ###############
+# 是否启用延迟跳转模式，当此选项为true时，玩家排完队后不会直接跳转，
+# 而是执行下面指定的指令，并等待30秒后重新加入排队队列
+enable_delay_transfer: false
+
+# 延迟跳转模式下要执行的指令（不包含斜杠）
+delay_transfer_command: "msg {player} 请等待服务器切换"
+
+# 延迟跳转等待时间（秒）
+delay_transfer_wait_time: 30
+
+# 是否启用命令加入队列模式，当此选项为true时，玩家必须执行/logser命令才能加入排队队列
+enable_command_queue: false

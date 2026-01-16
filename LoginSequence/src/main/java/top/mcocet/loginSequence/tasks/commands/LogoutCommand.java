@@ -45,8 +45,6 @@ public class LogoutCommand implements CommandExecutor {
         player.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE, 0, false, false));
         player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, Integer.MAX_VALUE, 255, false, false));
         
-        player.sendMessage(ChatColor.GREEN + "登出成功！请重新登录。");
-        
         // 启动登录提示任务
         plugin.getServer().getScheduler().runTaskAsynchronously(plugin, () -> {
             while (player.isOnline() && LoginSequence.WaitLogin.contains(player)) {
@@ -62,6 +60,13 @@ public class LogoutCommand implements CommandExecutor {
         
         // 从队列中移除玩家
         plugin.getQueue().remove(player);
+        
+        // 如果启用了命令队列模式，提醒玩家需要执行命令才能重新加入队列
+        if (top.mcocet.loginSequence.FillTask.enableCommandQueue) {
+            player.sendMessage(ChatColor.YELLOW + "登出成功！请执行 /logser 命令重新加入排队队列。");
+        } else {
+            player.sendMessage(ChatColor.GREEN + "登出成功！请重新登录。");
+        }
         
         return true;
     }

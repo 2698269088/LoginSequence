@@ -1,5 +1,5 @@
 name: LoginSequence
-version: '1.9'
+version: '1.10'
 main: top.mcocet.loginSequence.LoginSequence
 api-version: '1.20'
 description: A plugin to manage player login sequence and perform connectivity tests.
@@ -49,6 +49,10 @@ commands:
         description: 登录玩家
         usage: /logseq login
         permission: logseq.login
+      logser:
+        description: 加入排队队列
+        usage: /logseq logser
+        permission: logseq.logser
   register:
     description: 注册新账户
     usage: /register <密码> [验证密码]
@@ -58,6 +62,10 @@ commands:
   logout:
     description: 登出您的账户
     usage: /logout
+  logser:
+    description: 加入排队队列
+    usage: /logser
+    aliases: [joinqueue]
 
 permissions:
   logseq.admin:
@@ -73,6 +81,7 @@ permissions:
       logseq.register: true
       logseq.login: true
       logseq.link: true
+      logseq.linkout: true
   logseq.ping:
     description: 执行连通性测试的权限
     default: false
@@ -88,3 +97,6 @@ permissions:
   logseq.list:
     description: 查看JSON玩家数据的权限
     default: false
+  logseq.logser:
+    description: 加入排队队列的权限
+    default: true

@@ -41,7 +41,6 @@ import org.apache.logging.log4j.core.config.Configuration;
 
 
 public class LoginSequence extends JavaPlugin implements Listener {
-    private final Queue<Player> queue = new LinkedList(); // 玩家排队队列
     private String targetServer; // 目标服务器
     private boolean isTransferring = false; // 是否正在转移玩家
     private boolean piEula = false; // 玩家数据存储开关
@@ -55,15 +54,48 @@ public class LoginSequence extends JavaPlugin implements Listener {
     private LoginCommand loginCommand; // 登录命令实例
     private RegisterCommand registerCommand; // 注册命令实例
     private LogoutCommand logoutCommand; // 登出命令实例
+    private LogserCommand logserCommand; // 加入队列命令实例
+
+    private final Queue<Player> queue = new LinkedList(); // 玩家排队队列
+    public static ArrayList<Player> WaitLogin = new ArrayList<>(); // 等待登录的玩家列表
+    public static ArrayList<Player> CommandQueuePlayers = new ArrayList<>(); // 已执行命令并等待加入队列的玩家列表
+    private Map<String, Integer> playerWaitStatus = new HashMap<>(); // 玩家等待状态映射，key为玩家名称，value为等待状态（0:未等待, 1:正在等待）
     
-    // 等待登录的玩家列表
-    public static ArrayList<Player> WaitLogin = new ArrayList<>();
+    /**
+     * 设置玩家的等待状态
+     * @param playerName 玩家名称
+     * @param inWaiting 是否在等待期内
+     */
+    public void setPlayerInWaitingPeriod(String playerName, boolean inWaiting) {
+        if (inWaiting) {
+            playerWaitStatus.put(playerName, 1);
+        } else {
+            playerWaitStatus.remove(playerName);
+        }
+    }
+    
+    /**
+     * 获取玩家等待状态映射
+     * @return 玩家等待状态映射
+     */
+    public Map<String, Integer> getPlayerWaitStatus() {
+        return playerWaitStatus;
+    }
+    
+    /**
+     * 检查玩家是否在等待期内
+     * @param playerName 玩家名称
+     * @return 是否在等待期内
+     */
+    public boolean isPlayerInWaitingPeriod(String playerName) {
+        return playerWaitStatus.containsKey(playerName) && playerWaitStatus.get(playerName) == 1;
+    }
 
     public void onEnable() {
         // logo
         sayLog(ChatColor.AQUA+"    "+" "+ChatColor.BLUE+" __ "+" "+ChatColor.YELLOW+" ___");
         sayLog(ChatColor.AQUA+"|   "+" "+ChatColor.BLUE+"(__ "+" "+ChatColor.YELLOW+"|___");
-        sayLog(ChatColor.AQUA+"|___"+" "+ChatColor.BLUE+" __)"+" "+ChatColor.YELLOW+"|___"+ChatColor.GREEN+"    LoginSequence v1.9");
+        sayLog(ChatColor.AQUA+"|___"+" "+ChatColor.BLUE+" __)"+" "+ChatColor.YELLOW+"|___"+ChatColor.GREEN+"    LoginSequence v1.10");
         sayLog("");
         // 注册事件监听器和BungeeCord通道
         Bukkit.getPluginManager().registerEvents(this, this);
@@ -82,6 +114,8 @@ public class LoginSequence extends JavaPlugin implements Listener {
         loginCommand = new LoginCommand(this); // 创建登录指令
         registerCommand = new RegisterCommand(this); // 创建注册指令
         logoutCommand = new LogoutCommand(this); // 创建登出指令
+        logserCommand = new LogserCommand(this); // 创建加入队列指令
+
 
         // 初始化指令
         getCommand("logseq").setExecutor(commandTask);
@@ -89,6 +123,7 @@ public class LoginSequence extends JavaPlugin implements Listener {
         getCommand("login").setExecutor(loginCommand);
         getCommand("register").setExecutor(registerCommand);
         getCommand("logout").setExecutor(logoutCommand);
+        getCommand("logser").setExecutor(logserCommand);
         
         // 添加日志过滤器
         LoggerContext context = (LoggerContext) LogManager.getContext(false);
@@ -230,6 +265,14 @@ public class LoginSequence extends JavaPlugin implements Listener {
                         return;
                     }
                 }
+                
+                // 如果启用了命令队列模式，则不自动加入队列
+                if (FillTask.enableCommandQueue) {
+                    // 提示玩家需要执行命令才能加入队列
+                    player.sendMessage(ChatColor.YELLOW + "请执行 /logser 命令加入排队队列");
+                    return;
+                }
+                
                 // 处理后续的登录逻辑
                 playerLoginInit(player);
             }
@@ -237,7 +280,43 @@ public class LoginSequence extends JavaPlugin implements Listener {
     }
 
     public void playerLoginInit(Player player){
+        // 如果启用了命令队列模式，则不自动加入队列
+        if (FillTask.enableCommandQueue) {
+            // 提示玩家需要执行命令才能加入队列
+            player.sendMessage(ChatColor.YELLOW + "请执行 /logser 命令加入排队队列");
+            return;
+        }
+        
         // 如果没有启用密码登录，则正常加入队列
+        queue.add(player);
+        ChatColor var10001 = ChatColor.YELLOW;
+        player.sendMessage(var10001 + "您已加入服务器排队队列，当前排队位置：" + queue.size());
+        player.sendTitle(ChatColor.AQUA + "等待连接服务器，当前排队位置：" + ChatColor.YELLOW + queue.size(), "", 0, 100, 0);
+
+        // 只有在服务器在线时才处理队列
+        if (pingOnline.isGetServerOnlineInfo() || !FillTask.pionli) {
+            if (pingOnline.isConnectivityTestEnabled()) {
+                pingOnline.performConnectivityTestForPlayer(player);
+            } else {
+                isTransferring = false;
+                checkingTask.processQueue();
+            }
+        } else {
+            player.sendMessage(ChatColor.RED + "服务器当前不在线，请稍后再试");
+        }
+    }
+    
+    /**
+     * 将玩家加入排队队列
+     * @param player 玩家
+     */
+    public void addToQueue(Player player) {
+        // 检查玩家是否已经在队列中
+        if (queue.contains(player)) {
+            player.sendMessage(ChatColor.RED + "您已经在排队队列中了！");
+            return;
+        }
+        
         queue.add(player);
         ChatColor var10001 = ChatColor.YELLOW;
         player.sendMessage(var10001 + "您已加入服务器排队队列，当前排队位置：" + queue.size());

@@ -51,25 +51,38 @@ public class LoginCommand implements CommandExecutor {
             new BukkitRunnable() {
                 @Override
                 public void run() {
-                    plugin.getQueue().add(player);
-                    player.sendMessage(ChatColor.YELLOW + "您已加入服务器排队队列，当前排队位置：" + plugin.getQueue().size());
-                    player.sendTitle(ChatColor.AQUA + "等待连接服务器，当前排队位置：" + ChatColor.YELLOW + plugin.getQueue().size(), "", 0, 100, 0);
-
-                    // 只有在服务器在线时才处理队列
-                    if (plugin.getPingOnline().isGetServerOnlineInfo() || !FillTask.pionli) {
-                        if (plugin.getCheckingTask() != null) {
-                            plugin.getCheckingTask().notifyQueuePositions();
-                            plugin.processQueue();
-                        }
+                    // 检查是否启用了命令队列模式
+                    if (FillTask.enableCommandQueue) {
+                        // 提示玩家需要执行命令才能加入队列
+                        player.sendMessage(ChatColor.YELLOW + "登录成功！请执行 /logser 命令加入排队队列");
+                        
+                        // 移除玩家的限制效果
+                        player.removePotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS);
+                        player.removePotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY);
+                        player.removePotionEffect(org.bukkit.potion.PotionEffectType.SLOW);
+                        player.setGameMode(org.bukkit.GameMode.SURVIVAL);
                     } else {
-                        player.sendMessage(ChatColor.RED + "服务器当前不在线，请稍后再试");
+                        // 没有启用命令队列模式，自动加入队列
+                        plugin.getQueue().add(player);
+                        player.sendMessage(ChatColor.YELLOW + "您已加入服务器排队队列，当前排队位置：" + plugin.getQueue().size());
+                        player.sendTitle(ChatColor.AQUA + "等待连接服务器，当前排队位置：" + ChatColor.YELLOW + plugin.getQueue().size(), "", 0, 100, 0);
+
+                        // 只有在服务器在线时才处理队列
+                        if (plugin.getPingOnline().isGetServerOnlineInfo() || !FillTask.pionli) {
+                            if (plugin.getCheckingTask() != null) {
+                                plugin.getCheckingTask().notifyQueuePositions();
+                                plugin.processQueue();
+                            }
+                        } else {
+                            player.sendMessage(ChatColor.RED + "服务器当前不在线，请稍后再试");
+                        }
+                        
+                        // 移除玩家的限制效果
+                        player.removePotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS);
+                        player.removePotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY);
+                        player.removePotionEffect(org.bukkit.potion.PotionEffectType.SLOW);
+                        player.setGameMode(org.bukkit.GameMode.SURVIVAL);
                     }
-                    
-                    // 移除玩家的限制效果
-                    player.removePotionEffect(org.bukkit.potion.PotionEffectType.BLINDNESS);
-                    player.removePotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY);
-                    player.removePotionEffect(org.bukkit.potion.PotionEffectType.SLOW);
-                    player.setGameMode(org.bukkit.GameMode.SURVIVAL);
                 }
             }.runTaskLater(plugin, 20L); // 延迟1秒执行
         } else {
