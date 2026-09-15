@@ -1,3 +1,5 @@
+# 警告，因代码架构问题，此项目已停止维护，如果需要相同的功能，请移步https://github.com/2698269088/LoginQueue2
+# 如果您不需要那么复杂的功能，可以使用https://github.com/2698269088/MiniLoginQueue
 #  LoginSequence 插件组
 
 一套 Minecraft 队列登录管理解决方案，提供安全登录流程、跨服务器监控和优化跳转功能。
